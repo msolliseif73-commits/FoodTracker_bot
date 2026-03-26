@@ -1,17 +1,18 @@
 # meals.py
-def aggiungi_pasto(db, user_id, giorno, testo_pasto):
-    """
-    Inserisce un pasto nel database
-    """
-    conn = db
-    c = conn.cursor()
-    c.execute("INSERT INTO pasti (user_id, giorno, contenuto) VALUES (?,?,?)", (user_id, giorno, testo_pasto))
-    conn.commit()
+from database import get_user, update_user_field, add_or_update_user
 
-def conta_calorie(pasto):
-    """
-    Esempio base: calcola calorie da testo (da aggiornare con database cibi)
-    """
-    calorie_totali = 0
-    # Se vuoi aggiungere calcolo automatico, qui puoi collegare il tuo database cibi
-    return calorie_totali
+def handle_meal(update, users_data, file=None):
+    user_id = str(update.message.from_user.id)
+    text = update.message.text
+    user = get_user(user_id) or {}
+
+    # salva pasti
+    pasto = {"data": "oggi", "testo": text[5:].strip()}  # puoi migliorare data
+    if "pasti" not in user:
+        user["pasti"] = []
+    user["pasti"].append(pasto)
+    
+    add_or_update_user(user_id, user)
+    update_user_field(user_id, "pasti", user["pasti"])
+    
+    update.message.reply_text(f"Pasto salvato 🍎: {pasto['testo']}")
