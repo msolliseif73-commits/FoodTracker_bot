@@ -1,57 +1,37 @@
-# database.py
-import sqlite3
+import json
+from pathlib import Path
 
-DB_NAME = "foodtracker.db"
+DB_FILE = "users.json"
 
-def init_db():
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    # tabella utenti
-    c.execute("""CREATE TABLE IF NOT EXISTS utenti (
-                    user_id INTEGER PRIMARY KEY,
-                    sesso TEXT,
-                    eta INTEGER,
-                    altezza INTEGER,
-                    peso REAL
-                )""")
-    # tabella pasti
-    c.execute("""CREATE TABLE IF NOT EXISTS pasti (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER,
-                    giorno TEXT,
-                    contenuto TEXT
-                )""")
-    conn.commit()
-    conn.close()
+# --- Funzioni principali --- #
 
-def utente_esiste(user_id):
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute("SELECT 1 FROM utenti WHERE user_id=?", (user_id,))
-    result = c.fetchone()
-    conn.close()
-    return result is not None
+def load_users():
+    """Legge tutto il database dal file JSON"""
+    if Path(DB_FILE).exists():
+        with open(DB_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
 
-def aggiungi_utente(user_id, sesso, eta, altezza, peso):
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute("INSERT INTO utenti VALUES (?,?,?,?,?)", (user_id, sesso, eta, altezza, peso))
-    conn.commit()
-    conn.close()
+def save_users(data):
+    """Salva tutto il database nel file JSON"""
+    with open(DB_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
 
-def registra_pasto(user_id, giorno, contenuto):
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute("INSERT INTO pasti (user_id, giorno, contenuto) VALUES (?,?,?)", (user_id, giorno, contenuto))
-    conn.commit()
-    conn.close()
+def get_user(user_id):
+    """Restituisce i dati di un singolo utente, o None se non esiste"""
+    users = load_users()
+    return users.get(str(user_id))
 
-def calcola_livello(user_id):
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute("SELECT COUNT(*) FROM pasti WHERE user_id=?", (user_id,))
-    count = c.fetchone()[0]
-    conn.close()
-    # esempio: 1 livello ogni 3 pasti registrati
-    livello = 1 + count // 3
-    return livello
+def add_or_update_user(user_id, user_data):
+    """Aggiunge un nuovo utente o aggiorna i dati esistenti"""
+    users = load_users()
+    users[str(user_id)] = user_data
+    save_users(users)
+
+def update_user_field(user_id, field, value):
+    """Aggiorna un singolo campo dell’utente"""
+    users = load_users()
+    user = users.get(str(user_id), {})
+    user[field] = value
+    users[str(user_id)] = user
+    save_users(users)
