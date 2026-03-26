@@ -9,16 +9,14 @@ from levels import calcola_livello
 from workouts import scheda_base
 from premium import attiva_prova, is_premium
 
-# --- Logging ---
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
-)
+# Logging
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# --- Database ---
+# Database
 conn = sqlite3.connect('bot.db', check_same_thread=False)
 c = conn.cursor()
 
-# Crea tabelle se non esistono
+# Tabelle
 c.execute("""CREATE TABLE IF NOT EXISTS utenti (
     user_id INTEGER PRIMARY KEY,
     nome TEXT,
@@ -43,7 +41,7 @@ c.execute("""CREATE TABLE IF NOT EXISTS passi (
 
 conn.commit()
 
-# --- Helper ---
+# Helper
 def get_user(user_id):
     c.execute("SELECT * FROM utenti WHERE user_id=?", (user_id,))
     return c.fetchone()
@@ -55,7 +53,7 @@ def crea_utente(user_id, nome, sesso, eta, peso, altezza):
     )
     conn.commit()
 
-# --- Bot Handlers ---
+# Bot Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_nome = update.effective_user.first_name
@@ -101,7 +99,6 @@ async def messaggi(update: Update, context: ContextTypes.DEFAULT_TYPE):
             aggiungi_pasto(conn, user_id, giorno, contenuto)
             await update.message.reply_text(f"Pasto registrato per {giorno} {emoji_motivazionale()}")
             
-            # Calcolo livello dai passi (se ci sono)
             c.execute("SELECT passi_totali FROM passi WHERE user_id=?", (user_id,))
             res = c.fetchone()
             passi = res[0] if res else 0
@@ -110,7 +107,7 @@ async def messaggi(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await update.message.reply_text("Scrivi 'oggi: <cibo>' o 'ieri: <cibo>' per registrare un pasto.")
 
-# --- Comandi ---
+# Comandi
 async def passi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     c.execute("SELECT passi_totali, passi_conservati FROM passi WHERE user_id=?", (user_id,))
@@ -153,9 +150,8 @@ async def scheda(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("Prima devi registrare i tuoi dati con /start")
 
-# --- Setup Application ---
+# Setup Application
 app = ApplicationBuilder().token("<TOKEN>").build()
-
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("passi", passi))
 app.add_handler(CommandHandler("conserva", conserva))
