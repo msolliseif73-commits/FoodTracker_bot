@@ -1,78 +1,49 @@
-import telebot
-import json
-from datetime import date
-import os
+# main.py
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
+from database import init_db, utente_esiste, aggiungi_utente, registra_pasto, calcola_livello
 
-TOKEN = os.getenv("TOKEN")
-bot = telebot.TeleBot(TOKEN)
+TOKEN = "IL_TUO_TOKEN_BOT"
 
-FILE = "dati.json"
+# Inizializza il database
+init_db()
 
-cibi = {
-    "uovo": 70, "uova": 70, "pane": 265,
-    "pollo": 165, "tonno": 116, "yogurt": 60,
-    "riso": 130, "pasta": 130, "insalata": 15,
-    "mela": 52, "banana": 89
-}
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.from_user.id
+    nome = update.message.from_user.first_name
 
-kcal_per_passo = 0.04
-
-def calcola_kcal(testo):
-    totale = 0
-    parole = testo.lower().split(",")
-    for item in parole:
-        item = item.strip()
-        for cibo in cibi:
-            if cibo in item:
-                if "g" in item:
-                    try:
-                        grammi = int(item.split("g")[0].strip())
-                        totale += (cibi[cibo] * grammi) / 100
-                    except:
-                        pass
-                else:
-                    try:
-                        numero = int(item.split()[0])
-                        totale += cibi[cibo] * numero
-                    except:
-                        totale += cibi[cibo]
-    return totale
-
-from flask import Flask
-from threading import Thread
-
-app = Flask('')
-
-@app.route('/')
-def home():
-    return "Bot attivo!"
-
-def run():
-    app.run(host='0.0.0.0', port=8080)
-
-def keep_alive():
-    t = Thread(target=run)
-    t.start()
-
-keep_alive()
-
-@bot.message_handler(func=lambda message: True)
-def rispondi(message):
-    if message.text.lower().startswith("oggi"):
-        testo = message.text.replace("oggi:", "").strip()
-        kcal = calcola_kcal(testo)
-        kcal_bruciare = kcal + 250
-        passi = kcal_bruciare / kcal_per_passo
-        tempo = passi / 100
-
-        bot.reply_to(message, f"""
-📅 Giorno salvato!
-🍽 Calorie: {int(kcal)}
-🔥 Da bruciare: {int(kcal_bruciare)}
-🚶 Passi: {int(passi)}
-⏱ Tempo: {int(tempo)} min
-""")
+    if not utente_esiste(user_id):
+        await update.message.reply_text(f"Ciao {nome}! 👋 Benvenuto nel Food Tracker Bot! 💪\nPer iniziare, inviami i tuoi dati fisici separati da virgola: sesso, età, altezza(cm), peso(kg)\nEsempio: M,16,170,60")
     else:
-        bot.reply_to(message, "Scrivi:\noggi: cosa hai mangiato")
+        await update.message.reply_text(f"Bentornato {nome}! 😎 Scrivi 'oggi: …' per registrare i pasti di oggi o 'ieri: …' se ti sei scordato.")
 
-bot.infinity_polling()
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.from_user.id
+    text = update.message.text.strip().lower()
+
+    if not utente_esiste(user_id):
+        # onboarding dati utente
+        try:
+            sesso, eta, altezza, peso = [x.strip() for x in text.split(",")]
+            aggiungi_utente(user_id, sesso, int(eta), int(altezza), float(peso))
+            await update.message.reply_text("✅ Dati registrati! Ora puoi scrivere 'oggi: …' per registrare i pasti di oggi 🍎🥚")
+        except:
+            await update.message.reply_text("❌ Formato errato! Riprova: sesso, età, altezza(cm), peso(kg)")
+        return
+
+    # Registrazione pasti
+    if text.startswith("oggi:") or text.startswith("ieri:"):
+        tipo = "oggi" if text.startswith("oggi:") else "ieri"
+        contenuto = text.split(":",1)[1].strip()
+        registra_pasto(user_id, tipo, contenuto)
+        livello = calcola_livello(user_id)
+        await update.message.reply_text(f"✅ Ho registrato i tuoi pasti di {tipo}!\n🎯 Livello attuale: {livello} 💪")
+    else:
+        await update.message.reply_text("Scrivi 'oggi: …' o 'ieri: …' per registrare i pasti 🍎🥚")
+
+# Setup bot
+app = ApplicationBuilder().token(TOKEN).build()
+app.add_handler(CommandHandler("start", start))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+app.run_polling()
