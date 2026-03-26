@@ -1,37 +1,30 @@
 # levels.py
-def calcola_livello(passi_totali):
-    """
-    Sistema di livelli:
-    - Livelli 1-5: 500 passi per livello
-    - Livelli 6-15: 500 passi incrementali
-    - Dopo livello 15: aumenta di 500 passi per 15 livelli
-    - Dopo livello 100: maestrie
-    """
-    livello = 0
-    passi = passi_totali
-    # Livelli 1-5
-    for i in range(1, 6):
-        if passi >= 500:
-            passi -= 500
-            livello += 1
-        else:
-            return livello
-    # Livelli 6-15
-    for i in range(6, 16):
-        if passi >= 500:
-            passi -= 500
-            livello += 1
-        else:
-            return livello
-    # Livelli 16-100
-    while livello < 100:
-        if passi >= 500:
-            passi -= 500
-            livello += 1
-        else:
-            return livello
-    # Livelli >100
-    while passi >= 1000:
-        passi -= 1000
-        livello += 1
-    return livello
+from database import get_user, update_user_field, add_or_update_user
+
+def handle_steps(update, users_data, file=None):
+    user_id = str(update.message.from_user.id)
+    text = update.message.text
+    user = get_user(user_id) or {}
+
+    # estrai passi
+    try:
+        passi = int(text.split(":")[1].strip())
+    except:
+        update.message.reply_text("Formato errato! Usa: passi: NUMERO")
+        return
+
+    user["passi"] = user.get("passi", 0) + passi
+
+    # calcola livello
+    livello = user.get("livello", 0)
+    if livello < 5:
+        new_level = min(5, user["passi"] // 500)
+    elif livello < 100:
+        new_level = livello + passi // 500
+    else:
+        new_level = livello + passi // 1000
+
+    user["livello"] = new_level
+
+    add_or_update_user(user_id, user)
+    update.message.reply_text(f"Passi aggiornati 👣: {user['passi']} | Livello: {new_level}")
